@@ -1,2 +1,8 @@
-# computer-graphics-group042
-Repository of Group 042 in Basic Techniques in Computer Graphics (VO) [26ws-12.01221].
+# Group 042
+This repository is home to Group 042's programming assignments.
+
+## Group Members
+- Ahmad Prabowo
+- Florian Riepen
+- Martha Bosch
+- Tim Brauner
