@@ -1,0 +1,13 @@
+# Enumerate all team members in this file, one per line, using
+# the format <matriculation number> <name>.
+# Empty lines and lines starting with a hash symbol '#' are ignored.
+# Below is an example entry. Delete it before adding your own entries!
+#
+# Students not listed in this file will not receive any points.
+#
+# If this file is malformatted, the assignment will not be graded at all.
+
+393072 Florian Riepen
+494694 Ahmad Prabowo
+496337 Martha Bosch
+406147 Tim Brauner
