@@ -1,6 +1,6 @@
 /*===========================================================================*/
 /*                                                                           *
- * Copyright (c) 2026, Computer Graphics Group RWTH Aachen University        *
+ * Copyright (c) 2020, Computer Graphics Group RWTH Aachen University        *
  *                            All rights reserved                            *
  *                                                                           *
  * Basic Techniques in Computer Graphics Exercise                            *
@@ -9,478 +9,258 @@
 /*===========================================================================*/
 
 #include "assignment.hh"
-#include "glm/fwd.hpp"
-#include "main.hh"
 
+#include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/matrix.hpp>
-#include <iostream>
+
+extern int g_bunnyStrideSize;
+extern float g_bunnyMesh[];
+extern int g_bunnyColorStrideSize;
+extern int g_numberOfBunnyVertices;
+extern unsigned char g_bunnyColor[];
 
 namespace
 {
-glm::mat4 viewMatrix(1.f);
+glm::mat4 VPMatrix(1.f);
+glm::mat4 modelViewMatrix(1.f);
 glm::mat4 projectionMatrix(1.f);
 
-glm::mat4 getRotationMatrixZAxis(float angle)
+int windowHeight = 512;
+int windowWidth = 512;
+
+glm::vec3 eyePos = glm::vec3(0, 0, -2.3);
+glm::vec3 viewDir(0, 0, 0);
+
+
+// Implicit edge representation for one triangle edge.
+// p1 and p2 define the edge.
+// Evaluate the function at point.
+// If the result is negative, you are inside the triangle edge otherwise outside
+float evaluateF(const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& p)
 {
-    glm::mat4 r(1.f);
-    r[0][0] = std::cos(angle);
-    r[1][0] = -std::sin(angle);
-    r[0][1] = std::sin(angle);
-    r[1][1] = std::cos(angle);
-    r[2][2] = 1.0;
-    r[3][3] = 1.0;
-    return r;
+    // =========================================================================
+    // Rasterization based on Pineda
+    // Assignment section a
+    // Add your code here:
+    // ====================================================================
+
+    return (p.x - p1.x) * (p2.y - p1.y) - (p.y - p1.y) * (p2.x - p1.x);
+
+    // ====================================================================
+    // End Exercise code
+    // ====================================================================
 }
 
-glm::mat4 getRotationMatrixYAxis(float angle)
+
+// Rasterize one triangle
+// the input points are given in counterclockwise order
+void drawTriangle(const glm::vec4& p0_in, const glm::vec4& p1_in, const glm::vec4& p2_in, const glm::vec3& normal)
 {
-    glm::mat4 r(1.f);
-    r[0][0] = std::cos(angle);
-    r[2][0] = std::sin(angle);
-    r[1][1] = 1.0;
-    r[0][2] = -std::sin(angle);
-    r[2][2] = std::cos(angle);
-    r[3][3] = 1.0;
-    return r;
-}
+    // We use a hardcoded color
+    const glm::vec3 color = glm::vec3(0.6, 0.6, 0.6);
+
+    // We work in 2D when rasterizing, ... so we switch to 2D vectors
+    const glm::vec2 v0 = glm::vec2(p0_in[0], p0_in[1]);
+    const glm::vec2 v1 = glm::vec2(p1_in[0], p1_in[1]);
+    const glm::vec2 v2 = glm::vec2(p2_in[0], p2_in[1]);
+
+    // rasterizer initialized from minX to maxX and minY to MaxY
+    int minX = 0;
+    int minY = 0;
+    int maxX = windowWidth;
+    int maxY = windowHeight;
+
+    // Diffuse lighting coefficient
+    float diffuse = 1.0;
+
+    // =========================================================================
+    // Rasterization based on Pineda. Restrict rasterization range to bounding box and screen
+    // Assignment section b
+    // Add your code here:
+    // ====================================================================
+
+	minX = (int)std::floor(std::min({v0.x, v1.x, v2.x}));
+	maxX = (int)std::ceil(std::max({v0.x, v1.x, v2.x}));
+	minY = (int)std::floor(std::min({v0.y, v1.y, v2.y}));
+	maxY = (int)std::ceil(std::max({v0.y, v1.y, v2.y}));
+
+	minX = std::max(minX, 0);
+	minY = std::max(minY, 0);
+	maxX = std::min(maxX, windowWidth - 1);
+	maxY = std::min(maxY, windowHeight - 1);
+
+    // ====================================================================
+    // End Exercise code
+    // ====================================================================
 
 
-/*
- * A white circle represents the track center line
- */
-void drawTrackMarks(const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection)
-{
-    drawCircle(glm::vec3(1.0, 1.0, 1.0), model, view, projection);
-}
+    // =========================================================================
+    // Rasterization based on Pineda
+    // Assignment section f
+    // Add your code here:
+    // ====================================================================
+	
+	diffuse = glm::dot(normal, glm::vec3(0, 0, 1));
+	if (diffuse <= 0.f)
+		return;
+	
+    // ====================================================================
+    // End Exercise code
+    // ====================================================================
 
-/*
- * A Blue circle represents the tracks outer boundary
- */
-void drawOuterTrackMarks(const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection)
-{
-    drawCircle(glm::vec3(0.0, 0.0, 1.0), model, view, projection);
-}
 
-void drawTrack()
-{
-    for (unsigned int i = 0; i < 30; ++i)
+    // Rasterization
+    glm::vec2 p;
+    for (p[1] = minY; p[1] <= maxY; p[1]++)
     {
-        // Compute rotation for the marks
-        float angle = float(i) * 4.0f * M_PI / 60.0f;
+        for (p[0] = minX; p[0] <= maxX; p[0]++)
+        {
+            // =========================================================================
+            // Draw current pixel?
+            // Assignment section c
+            // Add your code here:
+            // ====================================================================
+			
+			if (evaluateF(v0, v1, p) > 0 ||
+				evaluateF(v1, v2, p) > 0 ||
+				evaluateF(v2, v0, p) > 0)
+			continue;
 
-        float next_angle = float(i + 1) * 4.0f * M_PI / 60.0f;
+            // Use this function to draw the pixel
+            // Do not modify it, just call it if you want to draw the pixel given by p
+            setPixel(p[0], p[1], diffuse * color);
 
-        float height = std::sin(angle * 2.0) * 0.1;
-
-        float next_height = std::sin(float(i + 1) * 4.0f * M_PI / 60.0f * 2.0) * 0.1;
-
-        glm::mat4 markRotation = getRotationMatrixZAxis(angle);
-
-        // =====================================================
-        // Track Center
-        // =====================================================
-
-        // Scaling
-        glm::mat4 scaleTrack(1.f);
-        scaleTrack[0][0] = 0.03;
-        scaleTrack[1][1] = 0.01;
-        scaleTrack[2][2] = 0.01;
-
-        // translate
-        glm::mat4 translateTrack(1.f);
-        translateTrack[3][1] = 0.8;    // Radius of the circle
-        translateTrack[3][2] = height; // Height
-
-        // rotate around y axis to follow track height change
-        glm::mat4 heightRotation = getRotationMatrixYAxis(-(M_PI / 2.0 - std::acos((height - next_height) / (2.0 * std::sin((next_angle - angle) / 2.0)))));
-
-        drawTrackMarks(markRotation * translateTrack * heightRotation * scaleTrack, viewMatrix, projectionMatrix);
-
-        // =====================================================
-        // Track Boundaries
-        // =====================================================
-
-        // Outer Circle
-        translateTrack[3][1] = 0.9; // Radius of the circle
-
-        drawOuterTrackMarks(markRotation * translateTrack * heightRotation * scaleTrack, viewMatrix, projectionMatrix);
-
-        // Inner Circle
-        translateTrack[3][1] = 0.7; // Radius of the circle
-
-        drawOuterTrackMarks(markRotation * translateTrack * heightRotation * scaleTrack, viewMatrix, projectionMatrix);
-    }
-}
-
-void drawTree(glm::vec3 const& pos)
-{
-    glm::mat4 transformWood(1.f);
-    glm::mat4 transformLeaves(1.f);
-
-    // Scale circle to form grandstand
-    transformWood[0][0] = 0.05;
-    transformWood[1][1] = 0.05;
-    transformWood[2][2] = 0.1;
-
-    // Place on the left of the track
-    transformWood[3][0] = pos.x;
-    transformWood[3][1] = pos.y;
-    transformWood[3][2] = pos.z;
-
-    drawCircle(glm::vec3(0.3, 0.3, 0.1), transformWood, viewMatrix, projectionMatrix);
-    
-    // Scale circle to leaves
-    transformLeaves[0][0] = 0.1;
-    transformLeaves[1][1] = 0.1;
-    transformLeaves[2][2] = 0.08;
-
-    // Place leaves on top of trunk
-    transformLeaves[3][2] = pos.z + 0.1;
-
-    transformLeaves[3][0] = pos.x + 0.02;
-    transformLeaves[3][1] = pos.y + 0.01;
-    drawCircle(glm::vec3(0.1, 0.9, 0.1), transformLeaves, viewMatrix, projectionMatrix);
-    transformLeaves[3][0] = pos.x + 0.02;
-    transformLeaves[3][1] = pos.y - 0.02;
-    drawCircle(glm::vec3(0.1, 0.9, 0.1), transformLeaves, viewMatrix, projectionMatrix);
-    transformLeaves[3][0] = pos.x - 0.01;
-    transformLeaves[3][1] = pos.y + 0.02;
-    drawCircle(glm::vec3(0.1, 0.9, 0.1), transformLeaves, viewMatrix, projectionMatrix);
-    transformLeaves[3][0] = pos.x - 0.02;
-    transformLeaves[3][1] = pos.y - 0.02;
-    drawCircle(glm::vec3(0.1, 0.9, 0.1), transformLeaves, viewMatrix, projectionMatrix);
-
-    transformLeaves[3][0] = pos.x;
-    transformLeaves[3][1] = pos.y;
-    transformLeaves[3][2] += 0.04;
-    drawCircle(glm::vec3(0.1, 0.9, 0.1), transformLeaves, viewMatrix, projectionMatrix);
-}
-
-void drawFinish()
-{
-    glm::mat4 transformFinish(1.f);
-
-    // Scaling
-    transformFinish[0][0] = 0.005;
-    transformFinish[1][1] = 0.03;
-    transformFinish[2][2] = 0.01;
-
-    // Initialize translation (Left boundary of track)
-    transformFinish[3][0] = -0.9;
-
-    // Draw nine marks from left to right
-    for (unsigned int i = 0; i < 9; ++i)
-    {
-        // Translate to next mark
-        transformFinish[3][0] += 0.02;
-
-        drawTrackMarks(transformFinish, viewMatrix, projectionMatrix);
-    }
-}
-
-void drawCar(float angle, int lane, glm::vec3 color)
-{
-    // Start with identity
-    glm::mat4 transformCar(1.f);
-    float height = std::sin(angle * 2.0) * 0.1;
-
-    // Scale second car to fit onto track
-    transformCar[0][0] *= 0.04;
-    transformCar[1][1] *= 0.1;
-    transformCar[2][2] *= 0.03;
-    transformCar[3][2] = -height;
-
-    // Transform second car to position 0 (x-direction)
-    if (lane == 1)
-    {
-        transformCar[3][0] = -0.85;
-    }
-    else
-    {
-        transformCar[3][0] = -0.75;
+            // ====================================================================
+            // End Exercise code
+            // ====================================================================
+        }
     }
 
-    glm::mat4 rotation = getRotationMatrixZAxis(angle);
-    rotation *= transformCar;
-
-    drawCircle(color, rotation, viewMatrix, projectionMatrix);
+    // ====================================================================
+    // End Exercise code
+    // ====================================================================
 }
-
 
 glm::mat4 buildFrustum(float phiInDegree, float aspectRatio, float near, float far)
 {
-    glm::mat4 fm(1.f);
+    float phiHalfInRadians = 0.5f * phiInDegree * (M_PI / 180.0f);
+    float t = near * tan(phiHalfInRadians);
+    float b = -t;
+    float left = b * aspectRatio;
+    float right = t * aspectRatio;
 
-    // ====================================================================
-    // buildFrustum function for programming exercise part b:
+    return glm::frustum(left, right, b, t, near, far);
+}
+}
+void task::drawScene(int _scene, float _runTime)
+{
+    viewDir = glm::normalize(glm::vec3(0, 0, 0) - eyePos);
+
+    // =========================================================================
+    // Clear Screen by using the setPixel Function
+    // Assignment section e
     // Add your code here:
     // ====================================================================
-
-	float phi = phiInDegree * float(M_PI) / 180.0f;
-	float t = near * std::tan(phi / 2.0f);
-	float r = aspectRatio * t;
-
-	float A = -(far + near) / (far - near);
-	float B = -2.0f * far * near / (far - near);
-
-	fm = glm::mat4(
-		near / r, 0,        0,  0,
-		0,        near / t, 0,  0,
-		0,        0,        A, -1,
-		0,        0,        B,  0);
-
-    // ===================================================================
+	
+	for (int y = 0; y < windowHeight; y++)
+		for (int x = 0; x < windowWidth; x++)
+			setPixel(x, y, glm::vec3(0.f));
+	
+    // ====================================================================
     // End Exercise code
     // ====================================================================
 
-    return fm;
-}
 
-glm::mat4 lookAt(const glm::vec3& camPos, const glm::vec3& viewDirection, const glm::vec3& up)
-{
-    // ====================================================================
-    // Lookat for programming exercise part a:
-    // Add your code here:
-    // ====================================================================
+    // Viewport transformation
+    VPMatrix = glm::scale(glm::mat4(1.), glm::vec3(windowWidth / 2.0, windowHeight / 2.0, 1.0)) * glm::translate(glm::mat4(1.), glm::vec3(1.0, 1.0, 0.0));
 
-	// define axes needed
-	glm::vec3 f = glm::normalize(viewDirection);
-	glm::vec3 r = glm::normalize(glm::cross(f, up));
-	glm::vec3 u = glm::cross(r, f);
+    // Create modelview matrix
+    // First: Create transformation into eye-space
+    // glm::lookAt needs the eye position, the center to look at and the up vector
+    modelViewMatrix = glm::lookAt(eyePos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
-	// move camera
-	glm::mat4 T = glm::transpose(glm::mat4(
-		1, 0, 0, -camPos.x,
-		0, 1, 0, -camPos.y,
-		0, 0, 1, -camPos.z,
-		0, 0, 0, 1));
+    // Create a projection matrix
+    projectionMatrix = buildFrustum(70.0f, (windowWidth / (float)windowHeight), 0.1f, 100.0f);
 
-	// rotate camera
-	glm::mat4 R = glm::transpose(glm::mat4(
-		r.x,  r.y,  r.z, 0,
-		u.x,  u.y,  u.z, 0,
-	   -f.x, -f.y, -f.z, 0,
-		0,    0,    0,   1));
+    // one vertex consists of 9 floats:
+    g_bunnyStrideSize = 9;
 
-	return R * T;
-
-    // ====================================================================
-    // End Exercise code
-    // ====================================================================
-}
-
-}
-
-
-void task::resizeCallback(int newWidth, int newHeight)
-{
-    glViewport(0, 0, newWidth, newHeight);
-
-    // ====================================================================
-    // projection matrix setup for programming exercise part d:
-    // Add your code here:
-    // ====================================================================
-
-	float aspectRatio = float(newWidth) / float(newHeight > 0 ? newHeight : 1);
-	projectionMatrix = buildFrustum(90.0f, aspectRatio, 0.1f, 10.0f);
-
-    // ====================================================================
-    // End Exercise code
-    // ====================================================================
-}
-
-void task::drawScene(int scene, float runTime)
-{
-    float angle1 = -2.0f * M_PI * runTime / 60.0f;
-
-    if (scene != 4)
+    if ((_scene == 2) || (_scene == 3))
     {
-        // =====================================================
-        // static camera for programming exercise part c:
+        // =========================================================================
+        // Let the bunny rotate around y-Axis
+        // Assignment section d
         // Add your code here:
-        // =====================================================
-
-		glm::vec3 camPos(0.0f, -1.0f, 1.0f);
-		viewMatrix = lookAt(camPos, glm::vec3(0.0f) - camPos, glm::vec3(0, 0, 1));
-
-        // =====================================================
+        // ====================================================================
+		
+		modelViewMatrix = modelViewMatrix * glm::rotate(glm::mat4(1.f), _runTime, glm::vec3(0, 1, 0));
+		
+        // ====================================================================
         // End Exercise code
-        // =====================================================
-    }
-    else
-    {
-        // rotate around track for the other parts, looking at the center:
-        glm::vec3 pos = glm::vec3(1.5f * std::sin(runTime), 1.5f * std::cos(runTime), 1.0f);
-        viewMatrix = lookAt(pos, glm::vec3(0, 0, 0) - pos, glm::cross(glm::cross(glm::vec3(0, 0, 0) - pos, glm::vec3(0, 0, 1)), glm::vec3(0, 0, 0) - pos));
+        // ====================================================================
     }
 
-    if (scene == 5)
+    glm::mat4 transformation = projectionMatrix * modelViewMatrix;
+
+    // Iterate over all triangles in the bunny
+    for (int i = 0; i < g_numberOfBunnyVertices; i += 3)
     {
-        float height = -std::sin(angle1 * 2.0) * 0.1;
+        // Get points and normals from bunny data array:
+        glm::vec4 p1 = glm::vec4(g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 0], g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 1],
+                                 g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 2], g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 3]);
 
+        glm::vec4 n1 = glm::vec4(g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 4], g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 5],
+                                 g_bunnyMesh[(i + 0) * g_bunnyStrideSize + 6], 0.0);
 
-        // =====================================================
-        // Moving camera for programming exercise part e:
-        // Add your code here:
-        // =====================================================
+        glm::vec4 p2 = glm::vec4(g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 0], g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 1],
+                                 g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 2], g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 3]);
 
-		// car pos. in lane 1
-		glm::vec3 eye(-0.85f * std::cos(angle1), -0.85f * std::sin(angle1), height + 0.05f);
+        glm::vec4 n2 = glm::vec4(g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 4], g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 5],
+                                 g_bunnyMesh[(i + 1) * g_bunnyStrideSize + 6], 0.0);
 
-		// angle decreases as time goes, direction of travel is dv of pos.
-		glm::vec3 dir(-0.85f * std::sin(angle1), 0.85f * std::cos(angle1), 0.2f * std::cos(2.0f * angle1));
+        glm::vec4 p3 = glm::vec4(g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 0], g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 1],
+                                 g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 2], g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 3]);
 
-		viewMatrix = lookAt(eye, dir, glm::vec3(0, 0, 1));
+        glm::vec4 n3 = glm::vec4(g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 4], g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 5],
+                                 g_bunnyMesh[(i + 2) * g_bunnyStrideSize + 6], 0.0);
 
-        // =====================================================
-        // End Exercise code
-        // =====================================================
-    }
+        // Apply transformations to points
+        p1 = transformation * p1;
+        p2 = transformation * p2;
+        p3 = transformation * p3;
 
+        // Compute normal of the current triangle
+        glm::vec3 normal = glm::normalize(glm::cross(glm::vec3(p2 - p1), glm::vec3(p3 - p1)));
 
-    // Draw Track (Border and inner track marks)
-    drawTrack();
+        // Transform normals by transposed inverse Modelview
+        glm::mat4 invMod = glm::transpose(glm::inverse(modelViewMatrix));
+        n1 = invMod * n1;
+        n2 = invMod * n2;
+        n3 = invMod * n3;
 
-    // Draw finish line
-    drawFinish();
+        // Dehomogenization
+        if (p1.w != 0.0)
+            p1 /= p1.w;
+        if (p2.w != 0.0)
+            p2 /= p2.w;
+        if (p3.w != 0.0)
+            p3 /= p3.w;
 
-    // Draw Trees
-    drawTree({-1.1, 0.1, 0.0});
-    drawTree({1.0, 1.0, 0.0});
-    drawTree({-0.8, 1.7, 0.0});
-    drawTree({1.0, -0.6, 0.0});
+        // Apply Viewport transformation
+        p1 = VPMatrix * p1;
+        p2 = VPMatrix * p2;
+        p3 = VPMatrix * p3;
 
-
-    drawCar(angle1, 1, glm::vec3(0, 1, 0));
-
-    float angle2 = 0.5f * -2.0f * M_PI * runTime / 60.0f;
-    drawCar(angle2, 2, glm::vec3(1, 1, 0));
-
-    if (scene == 3)
-    {
-        // optional bonus fun :-D
-
-        // state:
-        static float carPosition = 0.0f;
-        static float lastRunTime = runTime;
-        static float carSpeed = 0.0f;
-        static int carLane = 1;
-
-        static float spectatorPos = 0.9f;
-        static bool spectatorAlive = true;
-        static float spectatorDirection = -1.0f;
-
-        float timeDiff = runTime - lastRunTime;
-
-        // car control:
-        if (arrowKeyUpPressed)
-            carSpeed += timeDiff;
-        if (arrowKeyDownPressed)
-            carSpeed -= 2.0f * timeDiff;
-        carSpeed = glm::clamp(carSpeed, 0.0f, 1.0f);
-
-        if (arrowKeyRightPressed)
-            carLane = 2;
-        if (arrowKeyLeftPressed)
-            carLane = 1;
-
-        carPosition += -2.0f * M_PI * timeDiff * 0.5 * carSpeed;
-        if (carPosition < -2.0 * M_PI)
-            carPosition += 2.0 * M_PI;
-
-        // car rendering:
-        drawCar(carPosition, carLane, glm::vec3(1, 0, 0));
-
-        // car crash detection:
-        float distToCar;
-        float crashPos;
-        if (carLane == 1)
+        if (_scene <= 2)
         {
-            distToCar = std::abs(carPosition - angle1);
-            crashPos = 0.5 * (carPosition + angle1);
-        }
-        else
-        {
-            distToCar = std::abs(carPosition - angle2);
-            crashPos = 0.5 * (carPosition + angle2);
-        }
-        if (distToCar < 0.24f)
-        {
-            // crash!
-            carSpeed = 0.0f;
-
-            // Start with identity
-            glm::mat4 crash(1.f);
-
-            // Scale second car to fit onto track
-            crash[0][0] *= 0.02 + 0.5 * (0.24f - distToCar);
-            crash[1][1] *= 0.02 + 0.5 * (0.24f - distToCar);
-            crash[2][2] *= 0.02 + 0.5 * (0.24f - distToCar);
-
-            if (carLane == 1)
-            {
-                crash[3][0] = -0.85;
-            }
-            else
-            {
-                crash[3][0] = -0.75;
-            }
-            glm::mat4 rotation = getRotationMatrixZAxis(crashPos);
-            rotation *= crash;
-
-            drawCircle(glm::vec3(0.8, 0.8, 0.8), rotation, viewMatrix, projectionMatrix);
-        }
-
-        float spectatorSize = 0.025;
-        float distToSpectator = std::abs(carPosition);
-        if (distToSpectator < 0.12f)
-        {
-            if ((carLane == 1) && (std::abs(spectatorPos + 0.85) < 0.75 * spectatorSize))
-            {
-                spectatorAlive = false;
-            }
-            if ((carLane == 2) && (std::abs(spectatorPos + 0.75) < 0.75 * spectatorSize))
-            {
-                spectatorAlive = false;
-            }
+            // No shading. Uniform normals in eye direction.
+            normal = glm::vec3(0, 0, 1);
         }
 
 
-        glm::mat4 transformSpectator(1.f);
-
-        // spectator rendering:
-        glm::vec3 spectatorColor = glm::vec3(0.8, 0.2, 1.0);
-        if (spectatorAlive)
-        {
-            spectatorPos += 0.03f * timeDiff * spectatorDirection;
-            if (spectatorPos <= -0.9f)
-            {
-                spectatorPos = -0.9f;
-                spectatorDirection = 1.0f;
-            }
-            if (spectatorPos >= -0.7f)
-            {
-                spectatorPos = -0.7f;
-                spectatorDirection = -1.0f;
-            }
-            transformSpectator[2][2] = 0.06;
-        }
-        else
-        {
-            spectatorColor = glm::vec3(0.8, 0.0, 0.0);
-            spectatorSize *= 2.0f;
-            transformSpectator[2][2] = 0.005;
-        }
-
-
-        transformSpectator[0][0] = spectatorSize;
-        transformSpectator[1][1] = spectatorSize;
-        transformSpectator[3][0] = spectatorPos;
-
-        drawCircle(spectatorColor, transformSpectator, viewMatrix, projectionMatrix);
-
-        lastRunTime = runTime;
+        // Rasterize Triangle
+        // triangles are defined in counterclockwise order
+        drawTriangle(p1, p2, p3, normal);
     }
 }
 
